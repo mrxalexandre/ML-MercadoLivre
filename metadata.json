@@ -1,0 +1,6 @@
+{
+  "name": "Meli Viewer",
+  "description": "Visualizador de produtos do Mercado Livre com extração de imagens, vídeos e descrição.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,11 @@
+{
+  "$version": "1.0",
+  "collections": {
+    "products": {
+      "rules": {
+        "read": "true",
+        "write": "request.auth != null"
+      }
+    }
+  }
+}
