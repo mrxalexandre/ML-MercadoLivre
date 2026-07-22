@@ -101,7 +101,7 @@ export default function Admin() {
       <header className="bg-indigo-600 p-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center font-black text-indigo-900 text-xl">ML</div>
-          <h1 className="text-white font-bold text-2xl tracking-tight">Scraper<span className="text-amber-300 italic">Pro</span> <span className="text-sm font-normal text-indigo-300 ml-2">Painel Admin</span></h1>
+          <h1 className="text-white font-bold text-2xl tracking-tight">MRX<span className="text-amber-300 italic">scraper</span> <span className="text-sm font-normal text-indigo-300 ml-2">Painel Admin</span></h1>
         </div>
         <div className="flex items-center gap-4 text-indigo-100 font-bold">
           <a href="/" target="_blank" className="flex items-center gap-2 hover:text-white transition-colors bg-indigo-500 px-3 py-1.5 rounded-lg text-sm">
@@ -202,7 +202,7 @@ export default function Admin() {
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
           Painel Admin Ativo
         </div>
-        <div>© 2024 ScraperPro</div>
+        <div>© 2024 MRXscraper</div>
       </footer>
     </div>
   );
