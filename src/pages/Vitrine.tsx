@@ -3,11 +3,12 @@ import { ShoppingBag, Search } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc } from 'firebase/firestore';
 
 export default function Vitrine() {
   const [products, setProducts] = useState<(MeliProduct & { docId: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coupon, setCoupon] = useState('');
 
   useEffect(() => {
     // We don't order by in query so we can handle custom 'order' locally with fallback
@@ -37,7 +38,18 @@ export default function Vitrine() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        setCoupon(docSnap.data().dailyCoupon || '');
+      } else {
+        setCoupon('');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeSettings();
+    };
   }, []);
 
   return (
@@ -75,9 +87,14 @@ export default function Vitrine() {
       </header>
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 py-8">
-        <h1 className="text-2xl text-slate-800 font-semibold mb-6 flex items-center gap-3">
+        <h1 className="text-2xl text-slate-800 font-semibold mb-6 flex flex-wrap items-center gap-3">
           Ofertas do Dia do Mercado Livre
           <span className="bg-[#3483fa] text-white text-[10px] uppercase font-bold px-2 py-1 rounded-full tracking-wider">Novo</span>
+          {coupon && (
+            <span className="bg-pink-500 text-white text-xs uppercase font-bold px-3 py-1 rounded-md tracking-wider flex items-center gap-1 shadow-sm">
+              CUPOM DO DIA: <span className="text-pink-100">{coupon}</span>
+            </span>
+          )}
         </h1>
         
         {loading ? (

@@ -4,7 +4,7 @@ import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
 import { db } from '../firebase';
-import { collection, addDoc, deleteDoc, doc, query, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, query, onSnapshot, serverTimestamp, writeBatch, setDoc } from 'firebase/firestore';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 
@@ -19,6 +19,8 @@ export default function Admin() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [coupon, setCoupon] = useState('');
+  const [savingCoupon, setSavingCoupon] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -59,8 +61,17 @@ export default function Admin() {
       console.error("Error listening to products:", error);
     });
 
+    const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
+      if (docSnap.exists()) {
+        setCoupon(docSnap.data().dailyCoupon || '');
+      } else {
+        setCoupon('');
+      }
+    });
+
     return () => {
       unsubscribeProducts();
+      unsubscribeSettings();
     };
   }, []);
 
@@ -129,6 +140,18 @@ export default function Admin() {
     }
   };
   
+  const handleSaveCoupon = async () => {
+    if (!isAdmin) return;
+    setSavingCoupon(true);
+    try {
+      await setDoc(doc(db, 'settings', 'general'), { dailyCoupon: coupon }, { merge: true });
+    } catch (err) {
+      console.error("Error saving coupon", err);
+    } finally {
+      setSavingCoupon(false);
+    }
+  };
+
   const handleDelete = async (docId: string) => {
     if (!isAdmin) return;
     try {
@@ -224,6 +247,28 @@ export default function Admin() {
               )}
             </button>
           </form>
+
+          {isAdmin && (
+            <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-4">
+              <div className="flex-1 w-full">
+                <label className="text-sm font-semibold text-slate-600 mb-1 block">Cupom do Dia</label>
+                <input
+                  type="text"
+                  value={coupon}
+                  onChange={(e) => setCoupon(e.target.value)}
+                  placeholder="Ex: OFERTA10"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all uppercase"
+                />
+              </div>
+              <button
+                onClick={handleSaveCoupon}
+                disabled={savingCoupon}
+                className="w-full md:w-auto mt-5 md:mt-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-6 py-2.5 rounded-lg font-bold shadow-sm transition-all flex justify-center items-center gap-2"
+              >
+                {savingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>SALVAR CUPOM</span>}
+              </button>
+            </div>
+          )}
           
           {!isAdmin && (
             <div className="flex items-center justify-center gap-2 text-amber-700 bg-amber-50 py-3 px-4 rounded-xl border border-amber-200 max-w-2xl mx-auto">
