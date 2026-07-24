@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, Search, Bell, ShoppingCart, Menu } from 'lucide-react';
+import { ShoppingBag, Search } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { db } from '../firebase';
@@ -10,12 +10,26 @@ export default function Vitrine() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+    // We don't order by in query so we can handle custom 'order' locally with fallback
+    const q = query(collection(db, 'products'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({
         docId: doc.id,
         ...doc.data()
-      })) as (MeliProduct & { docId: string })[];
+      })) as (MeliProduct & { docId: string, order?: number, createdAt?: any })[];
+      
+      prods.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
+      
       setProducts(prods);
       setLoading(false);
     }, (error) => {
@@ -56,11 +70,6 @@ export default function Vitrine() {
             <a href="#" className="hidden lg:flex items-center gap-2 hover:text-black">
               <span className="text-sm font-semibold">Ofertas do Dia</span>
             </a>
-            <div className="flex items-center gap-4">
-              <Bell className="w-5 h-5 cursor-pointer hover:text-black" />
-              <ShoppingCart className="w-5 h-5 cursor-pointer hover:text-black" />
-              <Menu className="w-6 h-6 md:hidden cursor-pointer hover:text-black" />
-            </div>
           </div>
         </div>
       </header>

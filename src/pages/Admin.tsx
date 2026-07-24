@@ -1,29 +1,57 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2 } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
+import { SortableProductCard } from '../components/SortableProductCard';
 import { db, auth } from '../firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 
 export default function Admin() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [products, setProducts] = useState<(MeliProduct & { docId: string })[]>([]);
+  const [products, setProducts] = useState<(MeliProduct & { docId: string, order?: number, createdAt?: any })[]>([]);
   const [user, setUser] = useState<User | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
 
-    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+    // We don't order by in query so we can handle custom 'order' locally with fallback
+    const q = query(collection(db, 'products'));
     const unsubscribeProducts = onSnapshot(q, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({
         docId: doc.id,
         ...doc.data()
-      })) as (MeliProduct & { docId: string })[];
+      })) as (MeliProduct & { docId: string, order?: number, createdAt?: any })[];
+      
+      prods.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order;
+        }
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
+
       setProducts(prods);
     }, (error) => {
       console.error("Error listening to products:", error);
@@ -73,9 +101,14 @@ export default function Admin() {
 
       const productData = { ...data, permalink: url.trim() };
       
+      const nextOrder = products.length > 0 && products[0].order !== undefined 
+        ? products[0].order - 1 
+        : -1;
+
       // Save to firestore
       await addDoc(collection(db, 'products'), {
         ...productData,
+        order: nextOrder,
         createdAt: serverTimestamp()
       });
       
@@ -93,6 +126,34 @@ export default function Admin() {
       await deleteDoc(doc(db, 'products', docId));
     } catch (err) {
       console.error("Error deleting product", err);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = products.findIndex(p => p.docId === active.id);
+      const newIndex = products.findIndex(p => p.docId === over.id);
+      
+      const newProducts = arrayMove(products, oldIndex, newIndex);
+      
+      // Update local state immediately for snappy UI
+      setProducts(newProducts);
+      
+      // Update firestore in batch
+      if (user) {
+        try {
+          const batch = writeBatch(db);
+          newProducts.forEach((prod, index) => {
+            const prodRef = doc(db, 'products', prod.docId);
+            batch.update(prodRef, { order: index });
+          });
+          await batch.commit();
+        } catch (err) {
+          console.error("Error updating order in Firestore", err);
+        }
+      }
     }
   };
 
@@ -173,22 +234,45 @@ export default function Admin() {
         </div>
 
         {products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
-            {products.map((product, index) => (
-              <div key={product.docId} className="relative group">
-                <ProductCard product={product} />
-                {user && (
-                   <button 
-                     onClick={() => handleDelete(product.docId)}
-                     className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
-                     title="Excluir produto"
-                   >
-                     <Trash2 className="w-4 h-4" />
-                   </button>
-                )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={products.map(p => p.docId)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 animate-in fade-in duration-500">
+                {products.map((product) => (
+                  <SortableProductCard key={product.docId} id={product.docId}>
+                    <div className="relative group">
+                      <ProductCard product={product} />
+                      
+                      {user && (
+                         <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-1 rounded-md shadow-sm backdrop-blur-sm cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 z-10">
+                           <GripVertical className="w-5 h-5" />
+                         </div>
+                      )}
+
+                      {user && (
+                         <button 
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleDelete(product.docId);
+                           }}
+                           className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                           title="Excluir produto"
+                         >
+                           <Trash2 className="w-4 h-4" />
+                         </button>
+                      )}
+                    </div>
+                  </SortableProductCard>
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 mt-12 opacity-50">
             <ShoppingBag className="w-16 h-16" />
