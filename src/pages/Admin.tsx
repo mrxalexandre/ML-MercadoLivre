@@ -28,8 +28,14 @@ export default function Admin() {
   );
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser && currentUser.email !== 'mrxalexandre@gmail.com') {
+        await signOut(auth);
+        setUser(null);
+        alert("Acesso negado. Apenas o administrador pode acessar.");
+      } else {
+        setUser(currentUser);
+      }
     });
 
     // We don't order by in query so we can handle custom 'order' locally with fallback
@@ -66,7 +72,11 @@ export default function Admin() {
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user.email !== 'mrxalexandre@gmail.com') {
+        await signOut(auth);
+        alert("Acesso negado. Apenas o administrador pode acessar.");
+      }
     } catch (err) {
       console.error("Login failed", err);
     }
