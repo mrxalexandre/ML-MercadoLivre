@@ -28,4 +28,6 @@ export interface MeliProduct {
   plain_description?: string;
   thumbnail: string;
   secure_thumbnail: string;
+  createdAt?: any;
+  docId?: string;
 }

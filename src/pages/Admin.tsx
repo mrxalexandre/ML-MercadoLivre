@@ -1,11 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
-import { db, auth } from '../firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { db } from '../firebase';
+import { collection, addDoc, deleteDoc, doc, query, onSnapshot, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 
@@ -14,7 +13,12 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<(MeliProduct & { docId: string, order?: number, createdAt?: any })[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -28,17 +32,9 @@ export default function Admin() {
   );
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser && currentUser.email !== 'mrxalexandre@gmail.com') {
-        await signOut(auth);
-        setUser(null);
-        alert("Acesso negado. Apenas o administrador pode acessar.");
-      } else {
-        setUser(currentUser);
-      }
-    });
+    const adminStatus = localStorage.getItem('admin_logged_in') === 'true';
+    setIsAdmin(adminStatus);
 
-    // We don't order by in query so we can handle custom 'order' locally with fallback
     const q = query(collection(db, 'products'));
     const unsubscribeProducts = onSnapshot(q, (snapshot) => {
       const prods = snapshot.docs.map(doc => ({
@@ -64,31 +60,34 @@ export default function Admin() {
     });
 
     return () => {
-      unsubscribeAuth();
       unsubscribeProducts();
     };
   }, []);
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      if (result.user.email !== 'mrxalexandre@gmail.com') {
-        await signOut(auth);
-        alert("Acesso negado. Apenas o administrador pode acessar.");
-      }
-    } catch (err) {
-      console.error("Login failed", err);
+  const handleCustomLogin = (e: FormEvent) => {
+    e.preventDefault();
+    if (loginEmail === 'mrxalexandre@gmail.com' && loginPassword === 'x123456') {
+      localStorage.setItem('admin_logged_in', 'true');
+      setIsAdmin(true);
+      setShowLoginModal(false);
+      setLoginError('');
+      setLoginEmail('');
+      setLoginPassword('');
+    } else {
+      setLoginError("Credenciais inválidas.");
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    localStorage.removeItem('admin_logged_in');
+    setIsAdmin(false);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
 
-    if (!user) {
+    if (!isAdmin) {
       setError("Você precisa estar logado para adicionar produtos.");
       return;
     }
@@ -131,7 +130,7 @@ export default function Admin() {
   };
   
   const handleDelete = async (docId: string) => {
-    if (!user) return;
+    if (!isAdmin) return;
     try {
       await deleteDoc(doc(db, 'products', docId));
     } catch (err) {
@@ -148,11 +147,9 @@ export default function Admin() {
       
       const newProducts = arrayMove(products, oldIndex, newIndex);
       
-      // Update local state immediately for snappy UI
       setProducts(newProducts);
       
-      // Update firestore in batch
-      if (user) {
+      if (isAdmin) {
         try {
           const batch = writeBatch(db);
           newProducts.forEach((prod, index) => {
@@ -182,10 +179,10 @@ export default function Admin() {
             <ShoppingBag className="w-5 h-5" />
             <span>{products.length} {products.length === 1 ? 'Produto' : 'Produtos'}</span>
           </div>
-          {user ? (
+          {isAdmin ? (
             <button onClick={handleLogout} className="text-sm bg-indigo-800 hover:bg-indigo-900 px-3 py-1.5 rounded-lg transition-colors">Sair</button>
           ) : (
-            <button onClick={handleLogin} className="flex items-center gap-2 text-sm bg-indigo-500 hover:bg-indigo-400 px-3 py-1.5 rounded-lg transition-colors">
+            <button onClick={() => setShowLoginModal(true)} className="flex items-center gap-2 text-sm bg-indigo-500 hover:bg-indigo-400 px-3 py-1.5 rounded-lg transition-colors">
               <LogIn className="w-4 h-4"/> Entrar
             </button>
           )}
@@ -210,11 +207,11 @@ export default function Admin() {
               placeholder="Cole o link do Mercado Livre aqui..."
               className="flex-1 w-full outline-none text-lg text-slate-700 bg-transparent px-4 md:px-0 py-2 md:py-0"
               required
-              disabled={!user}
+              disabled={!isAdmin}
             />
             <button
               type="submit"
-              disabled={loading || !url.trim() || !user}
+              disabled={loading || !url.trim() || !isAdmin}
               className="w-full md:w-auto bg-pink-500 hover:bg-pink-600 disabled:bg-slate-300 text-white px-8 py-3 rounded-full font-bold text-lg shadow-md transition-all active:scale-95 flex justify-center items-center gap-2"
             >
               {loading ? (
@@ -228,7 +225,7 @@ export default function Admin() {
             </button>
           </form>
           
-          {!user && (
+          {!isAdmin && (
             <div className="flex items-center justify-center gap-2 text-amber-700 bg-amber-50 py-3 px-4 rounded-xl border border-amber-200 max-w-2xl mx-auto">
               <AlertCircle className="w-5 h-5" />
               <span className="text-sm font-medium">Faça login para adicionar novos produtos.</span>
@@ -259,13 +256,13 @@ export default function Admin() {
                     <div className="relative group">
                       <ProductCard product={product} />
                       
-                      {user && (
+                      {isAdmin && (
                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-1 rounded-md shadow-sm backdrop-blur-sm cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 z-10">
                            <GripVertical className="w-5 h-5" />
                          </div>
                       )}
 
-                      {user && (
+                      {isAdmin && (
                          <button 
                            onClick={(e) => {
                              e.stopPropagation();
@@ -298,6 +295,52 @@ export default function Admin() {
         </div>
         <div>© 2024 MRXscraper</div>
       </footer>
+
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-700">Acesso Administrativo</h3>
+              <button onClick={() => setShowLoginModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCustomLogin} className="p-6 flex flex-col gap-4">
+              {loginError && (
+                <div className="text-red-500 text-sm bg-red-50 p-2 rounded border border-red-100 text-center">
+                  {loginError}
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-slate-600">Email</label>
+                <input 
+                  type="email" 
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  placeholder="Seu e-mail"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-semibold text-slate-600">Senha</label>
+                <input 
+                  type="password" 
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  placeholder="Sua senha"
+                  required
+                />
+              </div>
+              <button type="submit" className="mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition-colors">
+                Entrar
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
