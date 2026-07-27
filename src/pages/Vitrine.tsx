@@ -58,14 +58,6 @@ export default function Vitrine() {
       <header className="bg-[#fff159] p-3 flex flex-col gap-3 shadow-sm sticky top-0 z-50">
         <div className="max-w-[1200px] mx-auto w-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="cursor-pointer flex items-center">
-              <img 
-                src="https://bring.com.br/blog/wp-content/uploads/2018/05/Mercado-Livre-logo.png" 
-                alt="Mercado Livre" 
-                className="h-10 object-contain"
-              />
-            </div>
-            
             <div className="hidden md:flex relative w-[500px]">
               <input 
                 type="text" 
