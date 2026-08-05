@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
@@ -21,6 +21,7 @@ export default function Admin() {
   const [loginError, setLoginError] = useState('');
   const [coupon, setCoupon] = useState('');
   const [savingCoupon, setSavingCoupon] = useState(false);
+  const [visitorsCount, setVisitorsCount] = useState(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -69,9 +70,14 @@ export default function Admin() {
       }
     });
 
+    const unsubscribeVisitors = onSnapshot(collection(db, 'visitors'), (snapshot) => {
+      setVisitorsCount(snapshot.size);
+    });
+
     return () => {
       unsubscribeProducts();
       unsubscribeSettings();
+      unsubscribeVisitors();
     };
   }, []);
 
@@ -202,6 +208,12 @@ export default function Admin() {
             <ShoppingBag className="w-5 h-5" />
             <span>{products.length} {products.length === 1 ? 'Produto' : 'Produtos'}</span>
           </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2 bg-indigo-700/50 px-4 py-2 rounded-xl">
+              <Users className="w-5 h-5" />
+              <span>{visitorsCount} {visitorsCount === 1 ? 'Visitante' : 'Visitantes'}</span>
+            </div>
+          )}
           {isAdmin ? (
             <button onClick={handleLogout} className="text-sm bg-indigo-800 hover:bg-indigo-900 px-3 py-1.5 rounded-lg transition-colors">Sair</button>
           ) : (
