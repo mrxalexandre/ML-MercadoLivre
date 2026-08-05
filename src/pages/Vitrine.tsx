@@ -74,8 +74,8 @@ export default function Vitrine() {
       {/* Header (Mercado Livre Style) */}
       <header className="bg-[#fff159] p-3 flex flex-col gap-3 shadow-sm sticky top-0 z-50">
         <div className="max-w-[1200px] mx-auto w-full flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="hidden md:flex relative flex-1 max-w-[500px]">
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex relative w-[500px]">
               <input 
                 type="text" 
                 placeholder="Buscar produtos, marcas e muito mais..." 
@@ -84,9 +84,6 @@ export default function Vitrine() {
               <button className="absolute right-0 top-0 h-10 w-10 flex items-center justify-center text-slate-500 border-l border-slate-200">
                 <Search className="w-5 h-5" />
               </button>
-            </div>
-            <div className="hidden md:flex relative w-[200px] h-10 bg-white rounded-sm overflow-hidden shadow-sm items-center">
-              <img src="/src/assets/images/happy_shoppers_1785165207545.jpg" alt="Pessoas felizes comprando" className="w-full h-full object-cover" />
             </div>
           </div>
           
