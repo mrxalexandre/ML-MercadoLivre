@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MeliProduct } from '../types';
 import { PlayCircle, Clock } from 'lucide-react';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 
 interface ProductCardProps {
@@ -53,11 +53,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     return null;
   }
 
+  const handleProductClick = () => {
+    if (product.docId && !isAdmin) {
+      updateDoc(doc(db, 'products', product.docId), {
+        clicks: increment(1)
+      }).catch(console.error);
+    }
+  };
+
   return (
     <a
       href={product.permalink}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleProductClick}
       className={`bg-white rounded-md p-0 shadow-sm border border-slate-100 flex flex-col hover:shadow-lg transition-shadow duration-300 group cursor-pointer overflow-hidden ${isExpired ? 'opacity-50 grayscale' : ''}`}
     >
       <div className="w-full aspect-square bg-white relative overflow-hidden flex items-center justify-center border-b border-slate-100">

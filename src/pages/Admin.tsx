@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users, MousePointerClick } from 'lucide-react';
 import { MeliProduct } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
@@ -316,6 +316,13 @@ export default function Admin() {
                       {isAdmin && (
                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 p-1 rounded-md shadow-sm backdrop-blur-sm cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 z-10">
                            <GripVertical className="w-5 h-5" />
+                         </div>
+                      )}
+
+                      {isAdmin && (
+                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md shadow-sm backdrop-blur-sm z-10 flex items-center gap-1 text-xs font-bold border border-indigo-200">
+                           <MousePointerClick className="w-3.5 h-3.5" />
+                           {product.clicks || 0}
                          </div>
                       )}
 

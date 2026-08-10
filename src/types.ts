@@ -30,4 +30,5 @@ export interface MeliProduct {
   secure_thumbnail: string;
   createdAt?: any;
   docId?: string;
+  clicks?: number;
 }
