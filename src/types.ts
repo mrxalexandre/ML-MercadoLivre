@@ -32,3 +32,11 @@ export interface MeliProduct {
   docId?: string;
   clicks?: number;
 }
+
+export interface Banner {
+  id?: string;
+  type: 'image' | 'video';
+  url: string;
+  link?: string;
+  createdAt?: any;
+}

@@ -20,7 +20,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       ? product.createdAt.toMillis() 
       : product.createdAt;
 
-    const expiresAt = createdAtMs + 24 * 60 * 60 * 1000;
+    // Add 2 hours for each click
+    const clickBonusMs = (product.clicks || 0) * 2 * 60 * 60 * 1000;
+    const expiresAt = createdAtMs + 24 * 60 * 60 * 1000 + clickBonusMs;
 
     const updateTimer = () => {
       const now = Date.now();

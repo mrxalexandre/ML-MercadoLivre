@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ShoppingBag, Search } from 'lucide-react';
-import { MeliProduct } from '../types';
+import { ShoppingBag, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MeliProduct, Banner } from '../types';
 import ProductCard from '../components/ProductCard';
 import { db } from '../firebase';
 import { collection, query, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Vitrine() {
   const [products, setProducts] = useState<(MeliProduct & { docId: string })[]>([]);
+  const [banners, setBanners] = useState<(Banner & { docId: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [coupon, setCoupon] = useState('');
+  const [currentBanner, setCurrentBanner] = useState(0);
 
   useEffect(() => {
     // Track unique visitor by IP
@@ -17,9 +19,20 @@ export default function Vitrine() {
         const response = await fetch('https://api.ipify.org?format=json');
         const data = await response.json();
         if (data.ip) {
+          const ua = navigator.userAgent;
+          const isMobile = /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua);
+          const deviceType = isMobile ? 'Mobile' : 'Desktop';
+          
+          const nav = navigator as any;
+          const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+          const connectionType = connection ? (connection.effectiveType || connection.type || 'unknown') : 'unknown';
+
           await setDoc(doc(db, 'visitors', data.ip.replace(/\./g, '_')), {
             ip: data.ip,
-            lastVisit: serverTimestamp()
+            lastVisit: serverTimestamp(),
+            userAgent: ua,
+            deviceType,
+            connectionType
           }, { merge: true });
         }
       } catch (err) {
@@ -37,6 +50,12 @@ export default function Vitrine() {
       })) as (MeliProduct & { docId: string, order?: number, createdAt?: any })[];
       
       prods.sort((a, b) => {
+        const clicksA = a.clicks || 0;
+        const clicksB = b.clicks || 0;
+        if (clicksA !== clicksB) {
+          return clicksB - clicksA;
+        }
+
         if (a.order !== undefined && b.order !== undefined) {
           return a.order - b.order;
         }
@@ -61,13 +80,39 @@ export default function Vitrine() {
       } else {
         setCoupon('');
       }
+    }, (error) => {
+      console.error("Error fetching settings:", error);
+    });
+
+    const unsubscribeBanners = onSnapshot(query(collection(db, 'banners')), (snapshot) => {
+      const b = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })) as (Banner & { docId: string })[];
+      b.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
+      setBanners(b);
+    }, (error) => {
+      console.error("Error fetching banners:", error);
     });
 
     return () => {
       unsubscribe();
       unsubscribeSettings();
+      unsubscribeBanners();
     };
   }, []);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentBanner(c => (c + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  const nextBanner = () => setCurrentBanner(c => (c + 1) % banners.length);
+  const prevBanner = () => setCurrentBanner(c => (c - 1 + banners.length) % banners.length);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ebebeb] font-sans">
@@ -96,6 +141,62 @@ export default function Vitrine() {
       </header>
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 py-8">
+        
+        {banners.length > 0 && (
+          <div className="relative w-full aspect-[21/9] md:aspect-[24/5] bg-slate-200 rounded-lg overflow-hidden mb-8 shadow-sm">
+            {banners.map((banner, idx) => (
+              <div 
+                key={banner.docId} 
+                className={`absolute inset-0 transition-opacity duration-500 ${idx === currentBanner ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+              >
+                {banner.link ? (
+                  <a href={banner.link} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
+                    {banner.type === 'image' ? (
+                      <img src={banner.url} alt="Banner" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={banner.url} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                    )}
+                  </a>
+                ) : (
+                  <>
+                    {banner.type === 'image' ? (
+                      <img src={banner.url} alt="Banner" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={banner.url} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            
+            {banners.length > 1 && (
+              <>
+                <button 
+                  onClick={prevBanner}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-800 p-2 rounded-full shadow-md transition-colors"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button 
+                  onClick={nextBanner}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-800 p-2 rounded-full shadow-md transition-colors"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                  {banners.map((_, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => setCurrentBanner(idx)}
+                      className={`w-2 h-2 rounded-full transition-colors ${idx === currentBanner ? 'bg-white' : 'bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <h1 className="text-2xl text-slate-800 font-semibold mb-6 flex flex-wrap items-center gap-3">
           Ofertas do Dia do Mercado Livre
           <span className="bg-[#3483fa] text-white text-[10px] uppercase font-bold px-2 py-1 rounded-full tracking-wider">Novo</span>

@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users, MousePointerClick } from 'lucide-react';
-import { MeliProduct } from '../types';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users, MousePointerClick, Image as ImageIcon, Video, Plus } from 'lucide-react';
+import { MeliProduct, Banner } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
 import { db } from '../firebase';
@@ -22,6 +22,13 @@ export default function Admin() {
   const [coupon, setCoupon] = useState('');
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [visitorsCount, setVisitorsCount] = useState(0);
+  const [visitors, setVisitors] = useState<any[]>([]);
+
+  const [banners, setBanners] = useState<(Banner & { docId: string })[]>([]);
+  const [bannerUrl, setBannerUrl] = useState('');
+  const [bannerLink, setBannerLink] = useState('');
+  const [bannerType, setBannerType] = useState<'image' | 'video'>('image');
+  const [savingBanner, setSavingBanner] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -68,16 +75,34 @@ export default function Admin() {
       } else {
         setCoupon('');
       }
+    }, (error) => {
+      console.error("Error listening to settings:", error);
     });
 
     const unsubscribeVisitors = onSnapshot(collection(db, 'visitors'), (snapshot) => {
       setVisitorsCount(snapshot.size);
+      setVisitors(snapshot.docs.map(doc => doc.data()));
+    }, (error) => {
+      console.error("Error listening to visitors:", error);
+    });
+
+    const unsubscribeBanners = onSnapshot(query(collection(db, 'banners')), (snapshot) => {
+      const b = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })) as (Banner & { docId: string })[];
+      b.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+      });
+      setBanners(b);
+    }, (error) => {
+      console.error("Error listening to banners:", error);
     });
 
     return () => {
       unsubscribeProducts();
       unsubscribeSettings();
       unsubscribeVisitors();
+      unsubscribeBanners();
     };
   }, []);
 
@@ -155,6 +180,35 @@ export default function Admin() {
       console.error("Error saving coupon", err);
     } finally {
       setSavingCoupon(false);
+    }
+  };
+
+  const handleAddBanner = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin || !bannerUrl.trim()) return;
+    setSavingBanner(true);
+    try {
+      await addDoc(collection(db, 'banners'), {
+        type: bannerType,
+        url: bannerUrl.trim(),
+        link: bannerLink.trim(),
+        createdAt: serverTimestamp()
+      });
+      setBannerUrl('');
+      setBannerLink('');
+    } catch (err) {
+      console.error("Error adding banner", err);
+    } finally {
+      setSavingBanner(false);
+    }
+  };
+
+  const handleDeleteBanner = async (docId: string) => {
+    if (!isAdmin) return;
+    try {
+      await deleteDoc(doc(db, 'banners', docId));
+    } catch (err) {
+      console.error("Error deleting banner", err);
     }
   };
 
@@ -261,7 +315,7 @@ export default function Admin() {
           </form>
 
           {isAdmin && (
-            <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-4">
+            <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-4">
               <div className="flex-1 w-full">
                 <label className="text-sm font-semibold text-slate-600 mb-1 block">Cupom do Dia</label>
                 <input
@@ -281,6 +335,34 @@ export default function Admin() {
               </button>
             </div>
           )}
+
+          {isAdmin && (
+            <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col gap-4">
+              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Estatísticas de Acesso
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center">
+                  <span className="text-3xl font-black text-indigo-600">{visitors.length}</span>
+                  <span className="text-xs text-slate-500 font-bold uppercase mt-1">Total Únicos</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center">
+                  <span className="text-3xl font-black text-indigo-600">{visitors.filter(v => v.deviceType === 'Mobile').length}</span>
+                  <span className="text-xs text-slate-500 font-bold uppercase mt-1">Mobile</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center">
+                  <span className="text-3xl font-black text-indigo-600">{visitors.filter(v => v.deviceType === 'Desktop').length}</span>
+                  <span className="text-xs text-slate-500 font-bold uppercase mt-1">Desktop</span>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center">
+                  <span className="text-3xl font-black text-indigo-600">{visitors.filter(v => ['wifi', '4g'].includes(v.connectionType?.toLowerCase())).length}</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase mt-1 leading-tight">Conexão Rápida<br/>(Wi-Fi / 4G)</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 mt-2 text-center">* Informações como gênero e idade não podem ser coletadas sem cadastro do usuário por motivos de privacidade e restrições dos navegadores.</p>
+            </div>
+          )}
           
           {!isAdmin && (
             <div className="flex items-center justify-center gap-2 text-amber-700 bg-amber-50 py-3 px-4 rounded-xl border border-amber-200 max-w-2xl mx-auto">
@@ -293,6 +375,75 @@ export default function Admin() {
             <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 py-3 px-4 rounded-xl border border-red-100 max-w-2xl mx-auto animate-in fade-in slide-in-from-top-2">
               <AlertCircle className="w-5 h-5" />
               <span className="text-sm font-medium">{error}</span>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col gap-4">
+              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                <ImageIcon className="w-5 h-5" />
+                Gerenciar Banners
+              </h3>
+              
+              <form onSubmit={handleAddBanner} className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={bannerType === 'image'} onChange={() => setBannerType('image')} className="text-indigo-600" />
+                    <span className="text-sm font-semibold text-slate-700">Imagem</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" checked={bannerType === 'video'} onChange={() => setBannerType('video')} className="text-indigo-600" />
+                    <span className="text-sm font-semibold text-slate-700">Vídeo</span>
+                  </label>
+                </div>
+                
+                <div className="flex flex-col md:flex-row gap-4">
+                  <input
+                    type="url"
+                    value={bannerUrl}
+                    onChange={(e) => setBannerUrl(e.target.value)}
+                    placeholder="URL da Imagem / Vídeo"
+                    className="flex-1 border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    required
+                  />
+                  <input
+                    type="url"
+                    value={bannerLink}
+                    onChange={(e) => setBannerLink(e.target.value)}
+                    placeholder="Link de Destino (Opcional)"
+                    className="flex-1 border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={savingBanner || !bannerUrl.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white px-6 py-2 rounded-lg font-bold shadow-sm transition-all flex justify-center items-center gap-2"
+                  >
+                    {savingBanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Adicionar</>}
+                  </button>
+                </div>
+              </form>
+              
+              {banners.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  {banners.map((banner) => (
+                    <div key={banner.docId} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-[21/9] bg-slate-100 flex items-center justify-center">
+                      {banner.type === 'image' ? (
+                        <img src={banner.url} alt="Banner" className="w-full h-full object-cover" />
+                      ) : (
+                        <video src={banner.url} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                      )}
+                      
+                      <button 
+                        onClick={() => handleDeleteBanner(banner.docId)}
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                        title="Excluir banner"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
