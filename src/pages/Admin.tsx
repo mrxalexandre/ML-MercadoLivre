@@ -1,10 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users, MousePointerClick, Image as ImageIcon, Video, Plus } from 'lucide-react';
+import { Search, Loader2, AlertCircle, ShoppingBag, ExternalLink, LogIn, Trash2, GripVertical, X, Users, MousePointerClick, Image as ImageIcon, Video, Plus, Clock } from 'lucide-react';
 import { MeliProduct, Banner } from '../types';
 import ProductCard from '../components/ProductCard';
 import { SortableProductCard } from '../components/SortableProductCard';
 import { db } from '../firebase';
-import { collection, addDoc, deleteDoc, doc, query, onSnapshot, serverTimestamp, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, doc, query, onSnapshot, serverTimestamp, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 
@@ -218,6 +218,17 @@ export default function Admin() {
       await deleteDoc(doc(db, 'products', docId));
     } catch (err) {
       console.error("Error deleting product", err);
+    }
+  };
+
+  const handleAddTime = async (docId: string, currentBonus: number) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'products', docId), {
+        bonusHours: currentBonus + 2
+      });
+    } catch (err) {
+      console.error("Error adding time", err);
     }
   };
 
@@ -471,23 +482,35 @@ export default function Admin() {
                       )}
 
                       {isAdmin && (
-                         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md shadow-sm backdrop-blur-sm z-10 flex items-center gap-1 text-xs font-bold border border-indigo-200">
+                         <div className="absolute top-2 right-2 bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md shadow-sm backdrop-blur-sm z-10 flex items-center gap-1 text-xs font-bold border border-indigo-200">
                            <MousePointerClick className="w-3.5 h-3.5" />
                            {product.clicks || 0}
                          </div>
                       )}
 
                       {isAdmin && (
-                         <button 
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             handleDelete(product.docId);
-                           }}
-                           className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
-                           title="Excluir produto"
-                         >
-                           <Trash2 className="w-4 h-4" />
-                         </button>
+                         <>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleAddTime(product.docId, product.bonusHours || 0);
+                             }}
+                             className="absolute -top-3 right-8 bg-indigo-500 text-white p-2 rounded-full shadow-lg hover:bg-indigo-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                             title="Adicionar +2 horas ao produto"
+                           >
+                             <Clock className="w-4 h-4" />
+                           </button>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleDelete(product.docId);
+                             }}
+                             className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                             title="Excluir produto"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </button>
+                         </>
                       )}
                     </div>
                   </SortableProductCard>

@@ -31,6 +31,7 @@ export interface MeliProduct {
   createdAt?: any;
   docId?: string;
   clicks?: number;
+  bonusHours?: number;
 }
 
 export interface Banner {
